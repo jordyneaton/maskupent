@@ -3,25 +3,48 @@ import ArtistCard from '@/components/ArtistCard'
 import ReleaseCard from '@/components/ReleaseCard'
 import Link from 'next/link'
 import { Artist } from '@/types/artist'
+import { Prisma } from '@prisma/client'
+
+type ArtistWithReleases = Prisma.ArtistGetPayload<{
+  include: { releases: true }
+}>
+
+type ReleaseWithArtist = Prisma.ReleaseGetPayload<{
+  include: { artist: true }
+}>
 
 export default async function Home() {
-  const [featuredArtists, latestReleases] = await Promise.all([
-    prisma.artist.findMany({
-      take: 5,
-      include: {
-        releases: true,
-      },
-    }),
-    prisma.release.findMany({
-      take: 5,
-      include: {
-        artist: true,
-      },
-      orderBy: {
-        releaseDate: 'desc',
-      },
-    }),
-  ])
+  let featuredArtists: ArtistWithReleases[] = []
+  let latestReleases: ReleaseWithArtist[] = []
+
+  try {
+    console.log('Fetching data from database...')
+    const [artists, releases] = await Promise.all([
+      prisma.artist.findMany({
+        take: 5,
+        include: {
+          releases: true,
+        },
+      }),
+      prisma.release.findMany({
+        take: 5,
+        include: {
+          artist: true,
+        },
+        orderBy: {
+          releaseDate: 'desc',
+        },
+      }),
+    ])
+
+    featuredArtists = artists
+    latestReleases = releases
+
+    console.log('Fetched artists:', artists)
+    console.log('Fetched releases:', releases)
+  } catch (error) {
+    console.error('Error fetching data:', error)
+  }
 
   // Transform the data to match the expected types
   const transformedArtists: Artist[] = featuredArtists.map(artist => ({
@@ -32,20 +55,16 @@ export default async function Home() {
     })),
   }))
 
+  console.log('Transformed artists:', transformedArtists)
+
   return (
     <main className="min-h-screen">
       {/* Hero Section */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 to-black z-10" />
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: 'url("/hero-bg.jpg")',
-            filter: 'blur(8px)',
-          }}
-        />
+        <div className="absolute inset-0 bg-white z-0" />
         <div className="relative z-20 text-center px-4">
-          <h1 className="text-5xl md:text-7xl font-bold mb-6">
+          <h1 className="text-5xl md:text-7xl font-bold mb-6 text-white">
             MASKUPENT
           </h1>
           <p className="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto mb-8">
@@ -64,7 +83,7 @@ export default async function Home() {
       <section className="py-20 bg-black">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between mb-12">
-            <h2 className="text-4xl font-bold">Featured Artists</h2>
+            <h2 className="text-4xl font-bold text-white">Featured Artists</h2>
             <Link
               href="/artists"
               className="text-gray-400 hover:text-white font-medium transition-colors"
@@ -73,9 +92,13 @@ export default async function Home() {
             </Link>
           </div>
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            {transformedArtists.map((artist) => (
-              <ArtistCard key={artist.id} artist={artist} />
-            ))}
+            {transformedArtists && transformedArtists.length > 0 ? (
+              transformedArtists.map((artist) => (
+                <ArtistCard key={artist.id} artist={artist} />
+              ))
+            ) : (
+              <p className="text-white col-span-full text-center">No artists found</p>
+            )}
           </div>
         </div>
       </section>
@@ -84,7 +107,7 @@ export default async function Home() {
       <section className="py-20 bg-gray-900">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between mb-12">
-            <h2 className="text-4xl font-bold">Latest Releases</h2>
+            <h2 className="text-4xl font-bold text-white">Latest Releases</h2>
             <Link
               href="/releases"
               className="text-gray-400 hover:text-white font-medium transition-colors"
@@ -93,9 +116,19 @@ export default async function Home() {
             </Link>
           </div>
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            {latestReleases.map((release) => (
-              <ReleaseCard key={release.id} release={release} />
-            ))}
+            {latestReleases && latestReleases.length > 0 ? (
+              latestReleases.map((release) => (
+                <ReleaseCard
+                  key={release.id}
+                  release={{
+                    ...release,
+                    releaseDate: release.releaseDate.toISOString()
+                  }}
+                />
+              ))
+            ) : (
+              <p className="text-white col-span-full text-center">No releases found</p>
+            )}
           </div>
         </div>
       </section>
@@ -104,7 +137,7 @@ export default async function Home() {
       <section className="py-20 bg-black">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-4xl font-bold mb-6">About MASKUPENT</h2>
+            <h2 className="text-4xl font-bold mb-6 text-white">About MASKUPENT</h2>
             <p className="text-xl text-gray-300 mb-8">
               We're a forward-thinking record label dedicated to discovering and nurturing the most innovative voices in rap music. Our mission is to push boundaries and create lasting impact in the industry.
             </p>

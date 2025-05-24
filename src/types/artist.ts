@@ -3,7 +3,7 @@ export interface Artist {
   name: string;
   bio: string;
   imageUrl: string;
-  releases: Release[];
+  releases?: Release[];
 }
 
 export interface Release {
